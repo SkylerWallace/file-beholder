@@ -1,0 +1,37 @@
+name: Windows build and tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Select stable Rust
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Test and build
+        shell: pwsh
+        run: ./scripts/build.ps1 -Test
+      - name: Upload Windows build and notices
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: file-beholder-windows-x86_64
+          if-no-files-found: error
+          path: |
+            target/release/file-beholder.exe
+            LICENSE
+            THIRD_PARTY_NOTICES.md
+            vendor/iced_tiny_skia/LICENSE
+            assets/material/LICENSE
+            docs/licenses/

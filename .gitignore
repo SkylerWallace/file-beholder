@@ -1,0 +1,23 @@
+/target/
+/dist/
+/.toolchain/
+/rustup-init.exe
+# Portable runtime preferences and saved tabs contain local paths.
+file-beholder.ini
+file-beholder-settings.ini
+file-beholder-session.json
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+*.trace
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# User-imported portable completion tones.
+file-beholder-sound-*.wav

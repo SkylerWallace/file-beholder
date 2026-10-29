@@ -1,0 +1,13 @@
+* text=auto eol=lf
+*.rs text
+*.toml text
+*.lock text
+*.md text
+*.ps1 text
+*.yml text
+*.svg text
+*.png binary
+*.ico binary
+*.rgba binary
+*.bin binary
+*.wav binary

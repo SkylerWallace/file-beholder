@@ -1,0 +1,1728 @@
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,5 +1,6 @@
+ #![allow(missing_docs)]
+ #![cfg_attr(docsrs, feature(doc_cfg))]
++pub mod profile;
+ pub mod window;
+ 
+ mod engine;
+@@ -29,9 +30,7 @@
+ pub use geometry::Geometry;
+ 
+ use crate::core::renderer;
+-use crate::core::{
+-    Background, Color, Font, Pixels, Point, Rectangle, Size, Transformation,
+-};
++use crate::core::{Background, Color, Font, Pixels, Point, Rectangle, Size, Transformation};
+ use crate::engine::Engine;
+ use crate::graphics::Viewport;
+ use crate::graphics::compositor;
+@@ -72,6 +71,8 @@
+         damage: &[Rectangle],
+         background_color: Color,
+     ) {
++        let started = crate::profile::draw_start();
++        self.engine.reset_clip_mask();
+         let scale_factor = viewport.scale_factor();
+ 
+         self.layers.flush();
+@@ -92,9 +93,7 @@
+             pixels.fill_path(
+                 &path,
+                 &tiny_skia::Paint {
+-                    shader: tiny_skia::Shader::SolidColor(engine::into_color(
+-                        background_color,
+-                    )),
++                    shader: tiny_skia::Shader::SolidColor(engine::into_color(background_color)),
+                     anti_alias: false,
+                     blend_mode: tiny_skia::BlendMode::Source,
+                     ..Default::default()
+@@ -105,15 +104,15 @@
+             );
+ 
+             for layer in self.layers.iter() {
+-                let Some(layer_bounds) =
+-                    damage_bounds.intersection(&(layer.bounds * scale_factor))
++                let Some(layer_bounds) = damage_bounds.intersection(&(layer.bounds * scale_factor))
+                 else {
+                     continue;
+                 };
+ 
+-                engine::adjust_clip_mask(clip_mask, layer_bounds);
++                self.engine.adjust_clip_mask(clip_mask, layer_bounds);
+ 
+                 if !layer.quads.is_empty() {
++                    let _stage = crate::profile::stage("quads");
+                     let render_span = debug::render(debug::Primitive::Quad);
+                     for (quad, background) in &layer.quads {
+                         self.engine.draw_quad(
+@@ -129,36 +128,36 @@
+                 }
+ 
+                 if !layer.primitives.is_empty() {
++                    let _stage = crate::profile::stage("primitives");
+                     let render_span = debug::render(debug::Primitive::Triangle);
+ 
+                     for group in &layer.primitives {
+-                        let Some(group_bounds) = (group.clip_bounds()
+-                            * scale_factor)
+-                            .intersection(&layer_bounds)
++                        let Some(group_bounds) =
++                            (group.clip_bounds() * scale_factor).intersection(&layer_bounds)
+                         else {
+                             continue;
+                         };
+ 
+-                        engine::adjust_clip_mask(clip_mask, group_bounds);
++                        self.engine.adjust_clip_mask(clip_mask, group_bounds);
+ 
+                         for primitive in group.as_slice() {
+                             self.engine.draw_primitive(
+                                 primitive,
+-                                Transformation::scale(scale_factor)
+-                                    * group.transformation(),
++                                Transformation::scale(scale_factor) * group.transformation(),
+                                 pixels,
+                                 clip_mask,
+                                 group_bounds,
+                             );
+                         }
+ 
+-                        engine::adjust_clip_mask(clip_mask, layer_bounds);
++                        self.engine.adjust_clip_mask(clip_mask, layer_bounds);
+                     }
+ 
+                     render_span.finish();
+                 }
+ 
+                 if !layer.images.is_empty() {
++                    let _stage = crate::profile::stage("images");
+                     let render_span = debug::render(debug::Primitive::Image);
+ 
+                     for image in &layer.images {
+@@ -175,14 +174,14 @@
+                 }
+ 
+                 if !layer.text.is_empty() {
++                    let _stage = crate::profile::stage("text");
+                     let render_span = debug::render(debug::Primitive::Image);
+ 
+                     for group in &layer.text {
+                         for text in group.as_slice() {
+                             self.engine.draw_text(
+                                 text,
+-                                Transformation::scale(scale_factor)
+-                                    * group.transformation(),
++                                Transformation::scale(scale_factor) * group.transformation(),
+                                 pixels,
+                                 clip_mask,
+                                 layer_bounds,
+@@ -196,6 +195,7 @@
+         }
+ 
+         self.engine.trim();
++        crate::profile::draw_end(started, self.engine.clip_stats(), damage.len());
+     }
+ }
+ 
+@@ -216,11 +216,7 @@
+         self.layers.pop_transformation();
+     }
+ 
+-    fn fill_quad(
+-        &mut self,
+-        quad: renderer::Quad,
+-        background: impl Into<Background>,
+-    ) {
++    fn fill_quad(&mut self, quad: renderer::Quad, background: impl Into<Background>) {
+         let (layer, transformation) = self.layers.current_mut();
+         layer.draw_quad(quad, background.into(), transformation);
+     }
+@@ -232,9 +228,7 @@
+     fn allocate_image(
+         &mut self,
+         _handle: &core::image::Handle,
+-        callback: impl FnOnce(Result<core::image::Allocation, core::image::Error>)
+-        + Send
+-        + 'static,
++        callback: impl FnOnce(Result<core::image::Allocation, core::image::Error>) + Send + 'static,
+     ) {
+         #[cfg(feature = "image")]
+         #[allow(unsafe_code)]
+@@ -277,13 +271,7 @@
+     ) {
+         let (layer, transformation) = self.layers.current_mut();
+ 
+-        layer.draw_paragraph(
+-            text,
+-            position,
+-            color,
+-            clip_bounds,
+-            transformation,
+-        );
++        layer.draw_paragraph(text, position, color, clip_bounds, transformation);
+     }
+ 
+     fn fill_editor(
+@@ -335,11 +323,7 @@
+                 text,
+                 clip_bounds,
+             } => {
+-                layer.draw_primitive_group(
+-                    primitives,
+-                    clip_bounds,
+-                    transformation,
+-                );
++                layer.draw_primitive_group(primitives, clip_bounds, transformation);
+ 
+                 for image in images {
+                     layer.draw_image(image, transformation);
+@@ -348,21 +332,13 @@
+                 layer.draw_text_group(text, clip_bounds, transformation);
+             }
+             Geometry::Cache(cache) => {
+-                layer.draw_primitive_cache(
+-                    cache.primitives,
+-                    cache.clip_bounds,
+-                    transformation,
+-                );
++                layer.draw_primitive_cache(cache.primitives, cache.clip_bounds, transformation);
+ 
+                 for image in cache.images.iter() {
+                     layer.draw_image(image.clone(), transformation);
+                 }
+ 
+-                layer.draw_text_cache(
+-                    cache.text,
+-                    cache.clip_bounds,
+-                    transformation,
+-                );
++                layer.draw_text_cache(cache.text, cache.clip_bounds, transformation);
+             }
+         }
+     }
+@@ -389,19 +365,11 @@
+         self.engine.raster_pipeline.load(handle)
+     }
+ 
+-    fn measure_image(
+-        &self,
+-        handle: &Self::Handle,
+-    ) -> Option<crate::core::Size<u32>> {
++    fn measure_image(&self, handle: &Self::Handle) -> Option<crate::core::Size<u32>> {
+         self.engine.raster_pipeline.dimensions(handle)
+     }
+ 
+-    fn draw_image(
+-        &mut self,
+-        image: core::Image,
+-        bounds: Rectangle,
+-        clip_bounds: Rectangle,
+-    ) {
++    fn draw_image(&mut self, image: core::Image, bounds: Rectangle, clip_bounds: Rectangle) {
+         let (layer, transformation) = self.layers.current_mut();
+         layer.draw_raster(image, bounds, clip_bounds, transformation);
+     }
+@@ -409,19 +377,11 @@
+ 
+ #[cfg(feature = "svg")]
+ impl core::svg::Renderer for Renderer {
+-    fn measure_svg(
+-        &self,
+-        handle: &core::svg::Handle,
+-    ) -> crate::core::Size<u32> {
++    fn measure_svg(&self, handle: &core::svg::Handle) -> crate::core::Size<u32> {
+         self.engine.vector_pipeline.viewport_dimensions(handle)
+     }
+ 
+-    fn draw_svg(
+-        &mut self,
+-        svg: core::Svg,
+-        bounds: Rectangle,
+-        clip_bounds: Rectangle,
+-    ) {
++    fn draw_svg(&mut self, svg: core::Svg, bounds: Rectangle, clip_bounds: Rectangle) {
+         let (layer, transformation) = self.layers.current_mut();
+         layer.draw_svg(svg, bounds, clip_bounds, transformation);
+     }
+@@ -437,9 +397,7 @@
+         default_text_size: Pixels,
+         backend: Option<&str>,
+     ) -> Option<Self> {
+-        if backend.is_some_and(|backend| {
+-            !["tiny-skia", "tiny_skia"].contains(&backend)
+-        }) {
++        if backend.is_some_and(|backend| !["tiny-skia", "tiny_skia"].contains(&backend)) {
+             return None;
+         }
+ 
+--- a/src/engine.rs
++++ b/src/engine.rs
+@@ -1,14 +1,15 @@
+ use crate::Primitive;
+ use crate::core::renderer::Quad;
+-use crate::core::{
+-    Background, Color, Gradient, Rectangle, Size, Transformation, Vector,
+-};
++use crate::core::{Background, Color, Gradient, Rectangle, Size, Transformation, Vector};
+ use crate::graphics::{Image, Text};
+ use crate::text;
+ 
+ #[derive(Debug)]
+ pub struct Engine {
+     text_pipeline: text::Pipeline,
++    clip_bounds: Option<[u32; 4]>,
++    clip_fills: u64,
++    clip_skips: u64,
+ 
+     #[cfg(feature = "image")]
+     pub(crate) raster_pipeline: crate::raster::Pipeline,
+@@ -20,11 +21,38 @@
+     pub fn new() -> Self {
+         Self {
+             text_pipeline: text::Pipeline::new(),
++            clip_bounds: None,
++            clip_fills: 0,
++            clip_skips: 0,
+             #[cfg(feature = "image")]
+             raster_pipeline: crate::raster::Pipeline::new(),
+             #[cfg(feature = "svg")]
+             vector_pipeline: crate::vector::Pipeline::new(),
+         }
++    }
++
++    pub fn reset_clip_mask(&mut self) {
++        self.clip_bounds = None;
++        self.clip_fills = 0;
++        self.clip_skips = 0;
++    }
++    pub fn clip_stats(&self) -> (u64, u64) {
++        (self.clip_fills, self.clip_skips)
++    }
++    pub fn adjust_clip_mask(&mut self, mask: &mut tiny_skia::Mask, bounds: Rectangle) {
++        let key = [
++            bounds.x.to_bits(),
++            bounds.y.to_bits(),
++            bounds.width.to_bits(),
++            bounds.height.to_bits(),
++        ];
++        if self.clip_bounds == Some(key) && !crate::profile::uncached() {
++            self.clip_skips += 1;
++            return;
++        }
++        adjust_clip_mask(mask, bounds);
++        self.clip_bounds = Some(key);
++        self.clip_fills += 1;
+     }
+ 
+     pub fn draw_quad(
+@@ -42,8 +70,7 @@
+             return;
+         }
+ 
+-        let clip_mask = (!physical_bounds.is_within(&clip_bounds))
+-            .then_some(clip_mask as &_);
++        let clip_mask = (!physical_bounds.is_within(&clip_bounds)).then_some(clip_mask as &_);
+ 
+         let transform = into_transform(transformation);
+ 
+@@ -90,48 +117,37 @@
+             let colors = (y..y + height)
+                 .flat_map(|y| (x..x + width).map(move |x| (x as f32, y as f32)))
+                 .filter_map(|(x, y)| {
+-                    tiny_skia::Size::from_wh(half_width, half_height).map(
+-                        |size| {
+-                            let shadow_distance = rounded_box_sdf(
+-                                Vector::new(
+-                                    x - physical_bounds.position().x
+-                                        - (shadow.offset.x
+-                                            * transformation.scale_factor())
+-                                        - half_width,
+-                                    y - physical_bounds.position().y
+-                                        - (shadow.offset.y
+-                                            * transformation.scale_factor())
+-                                        - half_height,
+-                                ),
+-                                size,
+-                                &radii,
+-                            )
+-                            .max(0.0);
+-                            let shadow_alpha = 1.0
+-                                - smoothstep(
+-                                    -shadow.blur_radius
+-                                        * transformation.scale_factor(),
+-                                    shadow.blur_radius
+-                                        * transformation.scale_factor(),
+-                                    shadow_distance,
+-                                );
+-
+-                            let mut color = into_color(shadow.color);
+-                            color.apply_opacity(shadow_alpha);
+-
+-                            color.to_color_u8().premultiply()
+-                        },
+-                    )
++                    tiny_skia::Size::from_wh(half_width, half_height).map(|size| {
++                        let shadow_distance = rounded_box_sdf(
++                            Vector::new(
++                                x - physical_bounds.position().x
++                                    - (shadow.offset.x * transformation.scale_factor())
++                                    - half_width,
++                                y - physical_bounds.position().y
++                                    - (shadow.offset.y * transformation.scale_factor())
++                                    - half_height,
++                            ),
++                            size,
++                            &radii,
++                        )
++                        .max(0.0);
++                        let shadow_alpha = 1.0
++                            - smoothstep(
++                                -shadow.blur_radius * transformation.scale_factor(),
++                                shadow.blur_radius * transformation.scale_factor(),
++                                shadow_distance,
++                            );
++
++                        let mut color = into_color(shadow.color);
++                        color.apply_opacity(shadow_alpha);
++
++                        color.to_color_u8().premultiply()
++                    })
+                 })
+                 .collect();
+ 
+             if let Some(pixmap) = tiny_skia::IntSize::from_wh(width, height)
+-                .and_then(|size| {
+-                    tiny_skia::Pixmap::from_vec(
+-                        bytemuck::cast_vec(colors),
+-                        size,
+-                    )
+-                })
++                .and_then(|size| tiny_skia::Pixmap::from_vec(bytemuck::cast_vec(colors), size))
+             {
+                 pixels.draw_pixmap(
+                     x as i32,
+@@ -144,63 +160,77 @@
+             }
+         }
+ 
+-        pixels.fill_path(
+-            &path,
+-            &tiny_skia::Paint {
+-                shader: match background {
+-                    Background::Color(color) => {
+-                        tiny_skia::Shader::SolidColor(into_color(*color))
+-                    }
+-                    Background::Gradient(Gradient::Linear(linear)) => {
+-                        let (start, end) =
+-                            linear.angle.to_distance(&quad.bounds);
+-
+-                        let stops: Vec<tiny_skia::GradientStop> = linear
+-                            .stops
+-                            .into_iter()
+-                            .flatten()
+-                            .map(|stop| {
+-                                tiny_skia::GradientStop::new(
+-                                    stop.offset,
+-                                    tiny_skia::Color::from_rgba(
+-                                        stop.color.b,
+-                                        stop.color.g,
+-                                        stop.color.r,
+-                                        stop.color.a,
++        let fill_stage = crate::profile::stage("fill");
++        let fast = match background {
++            Background::Color(color) if color.a == 1.0 => fill_solid_interior(
++                pixels,
++                &path,
++                transform,
++                physical_bounds,
++                fill_border_radius.into_iter().fold(0.0_f32, f32::max)
++                    * transformation.scale_factor(),
++                *color,
++                clip_mask,
++                clip_bounds,
++            ),
++            _ => false,
++        };
++        if !fast {
++            pixels.fill_path(
++                &path,
++                &tiny_skia::Paint {
++                    shader: match background {
++                        Background::Color(color) => {
++                            tiny_skia::Shader::SolidColor(into_color(*color))
++                        }
++                        Background::Gradient(Gradient::Linear(linear)) => {
++                            let (start, end) = linear.angle.to_distance(&quad.bounds);
++
++                            let stops: Vec<tiny_skia::GradientStop> = linear
++                                .stops
++                                .into_iter()
++                                .flatten()
++                                .map(|stop| {
++                                    tiny_skia::GradientStop::new(
++                                        stop.offset,
++                                        tiny_skia::Color::from_rgba(
++                                            stop.color.b,
++                                            stop.color.g,
++                                            stop.color.r,
++                                            stop.color.a,
++                                        )
++                                        .expect("Create color"),
+                                     )
+-                                    .expect("Create color"),
+-                                )
+-                            })
+-                            .collect();
+-
+-                        tiny_skia::LinearGradient::new(
+-                            tiny_skia::Point {
+-                                x: start.x,
+-                                y: start.y,
+-                            },
+-                            tiny_skia::Point { x: end.x, y: end.y },
+-                            if stops.is_empty() {
+-                                vec![tiny_skia::GradientStop::new(
+-                                    0.0,
+-                                    tiny_skia::Color::BLACK,
+-                                )]
+-                            } else {
+-                                stops
+-                            },
+-                            tiny_skia::SpreadMode::Pad,
+-                            tiny_skia::Transform::identity(),
+-                        )
+-                        .expect("Create linear gradient")
+-                    }
++                                })
++                                .collect();
++
++                            tiny_skia::LinearGradient::new(
++                                tiny_skia::Point {
++                                    x: start.x,
++                                    y: start.y,
++                                },
++                                tiny_skia::Point { x: end.x, y: end.y },
++                                if stops.is_empty() {
++                                    vec![tiny_skia::GradientStop::new(0.0, tiny_skia::Color::BLACK)]
++                                } else {
++                                    stops
++                                },
++                                tiny_skia::SpreadMode::Pad,
++                                tiny_skia::Transform::identity(),
++                            )
++                            .expect("Create linear gradient")
++                        }
++                    },
++                    anti_alias: true,
++                    ..tiny_skia::Paint::default()
+                 },
+-                anti_alias: true,
+-                ..tiny_skia::Paint::default()
+-            },
+-            tiny_skia::FillRule::EvenOdd,
+-            transform,
+-            clip_mask,
+-        );
+-
++                tiny_skia::FillRule::EvenOdd,
++                transform,
++                clip_mask,
++            );
++        }
++        drop(fill_stage);
++        let _border_stage = crate::profile::stage("border");
+         if border_width > 0.0 {
+             // Border path is offset by half the border width
+             let border_bounds = Rectangle {
+@@ -230,15 +260,12 @@
+ 
+             // Stroking a path works well in this case
+             if is_simple_border {
+-                let border_path =
+-                    rounded_rectangle(border_bounds, border_radius);
++                let border_path = rounded_rectangle(border_bounds, border_radius);
+ 
+                 pixels.stroke_path(
+                     &border_path,
+                     &tiny_skia::Paint {
+-                        shader: tiny_skia::Shader::SolidColor(into_color(
+-                            quad.border.color,
+-                        )),
++                        shader: tiny_skia::Shader::SolidColor(into_color(quad.border.color)),
+                         anti_alias: true,
+                         ..tiny_skia::Paint::default()
+                     },
+@@ -252,17 +279,13 @@
+             } else {
+                 // Draw corners that have too small border radii as having no border radius,
+                 // but mask them with the rounded rectangle with the correct border radius.
+-                let mut temp_pixmap = tiny_skia::Pixmap::new(
+-                    quad.bounds.width as u32,
+-                    quad.bounds.height as u32,
+-                )
+-                .unwrap();
+-
+-                let mut quad_mask = tiny_skia::Mask::new(
+-                    quad.bounds.width as u32,
+-                    quad.bounds.height as u32,
+-                )
+-                .unwrap();
++                let mut temp_pixmap =
++                    tiny_skia::Pixmap::new(quad.bounds.width as u32, quad.bounds.height as u32)
++                        .unwrap();
++
++                let mut quad_mask =
++                    tiny_skia::Mask::new(quad.bounds.width as u32, quad.bounds.height as u32)
++                        .unwrap();
+ 
+                 let zero_bounds = Rectangle {
+                     x: 0.0,
+@@ -272,12 +295,7 @@
+                 };
+                 let path = rounded_rectangle(zero_bounds, fill_border_radius);
+ 
+-                quad_mask.fill_path(
+-                    &path,
+-                    tiny_skia::FillRule::EvenOdd,
+-                    true,
+-                    transform,
+-                );
++                quad_mask.fill_path(&path, tiny_skia::FillRule::EvenOdd, true, transform);
+                 let path_bounds = Rectangle {
+                     x: border_width / 2.0,
+                     y: border_width / 2.0,
+@@ -285,15 +303,12 @@
+                     height: quad.bounds.height - border_width,
+                 };
+ 
+-                let border_radius_path =
+-                    rounded_rectangle(path_bounds, border_radius);
++                let border_radius_path = rounded_rectangle(path_bounds, border_radius);
+ 
+                 temp_pixmap.stroke_path(
+                     &border_radius_path,
+                     &tiny_skia::Paint {
+-                        shader: tiny_skia::Shader::SolidColor(into_color(
+-                            quad.border.color,
+-                        )),
++                        shader: tiny_skia::Shader::SolidColor(into_color(quad.border.color)),
+                         anti_alias: true,
+                         ..tiny_skia::Paint::default()
+                     },
+@@ -334,15 +349,14 @@
+                 transformation: local_transformation,
+             } => {
+                 let transformation = transformation * *local_transformation;
+-                let Some(clip_bounds) = clip_bounds
+-                    .intersection(&(*local_clip_bounds * transformation))
++                let Some(clip_bounds) =
++                    clip_bounds.intersection(&(*local_clip_bounds * transformation))
+                 else {
+                     return;
+                 };
+ 
+                 let physical_bounds =
+-                    Rectangle::new(*position, paragraph.min_bounds)
+-                        * transformation;
++                    Rectangle::new(*position, paragraph.min_bounds) * transformation;
+ 
+                 if !clip_bounds.intersects(&physical_bounds) {
+                     return;
+@@ -351,7 +365,7 @@
+                 let clip_mask = match physical_bounds.is_within(&clip_bounds) {
+                     true => None,
+                     false => {
+-                        adjust_clip_mask(clip_mask, clip_bounds);
++                        self.adjust_clip_mask(clip_mask, clip_bounds);
+                         Some(clip_mask as &_)
+                     }
+                 };
+@@ -373,14 +387,13 @@
+                 transformation: local_transformation,
+             } => {
+                 let transformation = transformation * *local_transformation;
+-                let Some(clip_bounds) = clip_bounds
+-                    .intersection(&(*local_clip_bounds * transformation))
++                let Some(clip_bounds) =
++                    clip_bounds.intersection(&(*local_clip_bounds * transformation))
+                 else {
+                     return;
+                 };
+ 
+-                let physical_bounds =
+-                    Rectangle::new(*position, editor.bounds) * transformation;
++                let physical_bounds = Rectangle::new(*position, editor.bounds) * transformation;
+ 
+                 if !clip_bounds.intersects(&physical_bounds) {
+                     return;
+@@ -389,7 +402,7 @@
+                 let clip_mask = match physical_bounds.is_within(&clip_bounds) {
+                     true => None,
+                     false => {
+-                        adjust_clip_mask(clip_mask, clip_bounds);
++                        self.adjust_clip_mask(clip_mask, clip_bounds);
+                         Some(clip_mask as &_)
+                     }
+                 };
+@@ -424,7 +437,7 @@
+                 let clip_mask = match physical_bounds.is_within(&clip_bounds) {
+                     true => None,
+                     false => {
+-                        adjust_clip_mask(clip_mask, clip_bounds);
++                        self.adjust_clip_mask(clip_mask, clip_bounds);
+                         Some(clip_mask as &_)
+                     }
+                 };
+@@ -467,8 +480,8 @@
+                     return;
+                 }
+ 
+-                let clip_mask = (!physical_bounds.is_within(&clip_bounds))
+-                    .then_some(clip_mask as &_);
++                let clip_mask =
++                    (!physical_bounds.is_within(&clip_bounds)).then_some(clip_mask as &_);
+ 
+                 self.text_pipeline.draw_raw(
+                     &buffer,
+@@ -507,8 +520,8 @@
+                     return;
+                 }
+ 
+-                let clip_mask = (!physical_bounds.is_within(&clip_bounds))
+-                    .then_some(clip_mask as &_);
++                let clip_mask =
++                    (!physical_bounds.is_within(&clip_bounds)).then_some(clip_mask as &_);
+ 
+                 pixels.fill_path(
+                     path,
+@@ -538,8 +551,8 @@
+                     return;
+                 }
+ 
+-                let clip_mask = (!physical_bounds.is_within(&clip_bounds))
+-                    .then_some(clip_mask as &_);
++                let clip_mask =
++                    (!physical_bounds.is_within(&clip_bounds)).then_some(clip_mask as &_);
+ 
+                 pixels.stroke_path(
+                     path,
+@@ -569,8 +582,8 @@
+                     return;
+                 }
+ 
+-                let clip_mask = (!physical_bounds.is_within(&_clip_bounds))
+-                    .then_some(_clip_mask as &_);
++                let clip_mask =
++                    (!physical_bounds.is_within(&_clip_bounds)).then_some(_clip_mask as &_);
+ 
+                 let center = physical_bounds.center();
+                 let radians = f32::from(image.rotation);
+@@ -599,8 +612,8 @@
+                     return;
+                 }
+ 
+-                let clip_mask = (!physical_bounds.is_within(&_clip_bounds))
+-                    .then_some(_clip_mask as &_);
++                let clip_mask =
++                    (!physical_bounds.is_within(&_clip_bounds)).then_some(_clip_mask as &_);
+ 
+                 let center = physical_bounds.center();
+                 let radians = f32::from(svg.rotation);
+@@ -623,15 +636,11 @@
+             }
+             #[cfg(not(feature = "image"))]
+             Image::Raster { .. } => {
+-                log::warn!(
+-                    "Unsupported primitive in `iced_tiny_skia`: {image:?}",
+-                );
++                log::warn!("Unsupported primitive in `iced_tiny_skia`: {image:?}",);
+             }
+             #[cfg(not(feature = "svg"))]
+             Image::Vector { .. } => {
+-                log::warn!(
+-                    "Unsupported primitive in `iced_tiny_skia`: {image:?}",
+-                );
++                log::warn!("Unsupported primitive in `iced_tiny_skia`: {image:?}",);
+             }
+         }
+     }
+@@ -665,25 +674,13 @@
+     }
+ }
+ 
+-fn rounded_rectangle(
+-    bounds: Rectangle,
+-    border_radius: [f32; 4],
+-) -> tiny_skia::Path {
++fn rounded_rectangle(bounds: Rectangle, border_radius: [f32; 4]) -> tiny_skia::Path {
+     let [top_left, top_right, bottom_right, bottom_left] = border_radius;
+ 
+-    if top_left == 0.0
+-        && top_right == 0.0
+-        && bottom_right == 0.0
+-        && bottom_left == 0.0
+-    {
++    if top_left == 0.0 && top_right == 0.0 && bottom_right == 0.0 && bottom_left == 0.0 {
+         return tiny_skia::PathBuilder::from_rect(
+-            tiny_skia::Rect::from_xywh(
+-                bounds.x,
+-                bounds.y,
+-                bounds.width,
+-                bounds.height,
+-            )
+-            .expect("Build quad rectangle"),
++            tiny_skia::Rect::from_xywh(bounds.x, bounds.y, bounds.width, bounds.height)
++                .expect("Build quad rectangle"),
+         );
+     }
+ 
+@@ -815,11 +812,7 @@
+     x * x * (3.0 - 2.0 * x)
+ }
+ 
+-fn rounded_box_sdf(
+-    to_center: Vector,
+-    size: tiny_skia::Size,
+-    radii: &[f32],
+-) -> f32 {
++fn rounded_box_sdf(to_center: Vector, size: tiny_skia::Size, radii: &[f32]) -> f32 {
+     let radius = match (to_center.x > 0.0, to_center.y > 0.0) {
+         (true, true) => radii[2],
+         (true, false) => radii[1],
+@@ -839,13 +832,7 @@
+     let path = {
+         let mut builder = tiny_skia::PathBuilder::new();
+         builder.push_rect(
+-            tiny_skia::Rect::from_xywh(
+-                bounds.x,
+-                bounds.y,
+-                bounds.width,
+-                bounds.height,
+-            )
+-            .unwrap(),
++            tiny_skia::Rect::from_xywh(bounds.x, bounds.y, bounds.width, bounds.height).unwrap(),
+         );
+ 
+         builder.finish().unwrap()
+@@ -858,3 +845,314 @@
+         tiny_skia::Transform::default(),
+     );
+ }
++
++#[cfg(test)]
++mod renderer_clip_tests {
++    use super::*;
++    #[test]
++    fn identical_bounds_and_frame_reset_preserve_mask_bytes() {
++        let mut engine = Engine::new();
++        let mut cached = tiny_skia::Mask::new(160, 100).unwrap();
++        let mut original = tiny_skia::Mask::new(160, 100).unwrap();
++        let rects = [
++            Rectangle {
++                x: 2.25,
++                y: 3.75,
++                width: 90.5,
++                height: 70.0,
++            },
++            Rectangle {
++                x: 2.25,
++                y: 3.75,
++                width: 90.5,
++                height: 70.0,
++            },
++            Rectangle {
++                x: 0.0,
++                y: 10.0,
++                width: 80.0,
++                height: 30.0,
++            },
++        ];
++        for b in rects {
++            engine.adjust_clip_mask(&mut cached, b);
++            adjust_clip_mask(&mut original, b);
++            assert_eq!(cached.data(), original.data());
++        }
++        assert_eq!(engine.clip_stats(), (2, 1));
++        engine.reset_clip_mask();
++        let mut fresh = tiny_skia::Mask::new(160, 100).unwrap();
++        engine.adjust_clip_mask(&mut fresh, rects[2]);
++        assert_eq!(fresh.data(), original.data());
++        assert_eq!(engine.clip_stats(), (1, 0));
++        let mut second = Engine::new();
++        second.adjust_clip_mask(&mut original, rects[0]);
++        engine.adjust_clip_mask(&mut fresh, rects[2]);
++        let mut oracle = tiny_skia::Mask::new(160, 100).unwrap();
++        adjust_clip_mask(&mut oracle, rects[2]);
++        assert_eq!(fresh.data(), oracle.data());
++    }
++}
++
++// Keep the reference rasterizer for curved edge bands. Only the known opaque,
++// integer-aligned interior is filled directly; clipped/translucent cases fall back.
++fn fill_solid_interior(
++    pixels: &mut tiny_skia::PixmapMut<'_>,
++    path: &tiny_skia::Path,
++    transform: tiny_skia::Transform,
++    bounds: Rectangle,
++    radius: f32,
++    color: Color,
++    mask: Option<&tiny_skia::Mask>,
++    clip: Rectangle,
++) -> bool {
++    if crate::profile::reference_raster() {
++        return false;
++    }
++    let left = bounds.x;
++    let right = bounds.x + bounds.width;
++    if ![clip.x, clip.y, clip.width, clip.height]
++        .into_iter()
++        .all(f32::is_finite)
++    {
++        return false;
++    }
++    let top = (bounds.y + radius).ceil().max(0.0).max(clip.y.ceil());
++    let bottom = (bounds.y + bounds.height - radius)
++        .floor()
++        .min(pixels.height() as f32)
++        .min((clip.y + clip.height).floor());
++    if ![left, right, top, bottom].into_iter().all(f32::is_finite)
++        || left.fract() != 0.0
++        || right.fract() != 0.0
++        || top < 0.0
++        || bottom > pixels.height() as f32
++        || bottom <= top
++    {
++        return false;
++    }
++    let Some(physical) = path.clone().transform(transform) else {
++        return false;
++    };
++    let width = pixels.width();
++    let height = pixels.height();
++    let paint = tiny_skia::Paint {
++        shader: tiny_skia::Shader::SolidColor(into_color(color)),
++        anti_alias: true,
++        ..Default::default()
++    };
++    let pixel: u32 = bytemuck::cast(into_color(color).to_color_u8().premultiply());
++    let top = top as usize;
++    let bottom = bottom as usize;
++    let stride = width as usize * 4;
++    let data = pixels.data_mut();
++    let start = left.max(0.0) as usize;
++    let end = right.min(width as f32).max(0.0) as usize;
++    if start >= end || start > width as usize {
++        return false;
++    }
++    for (index, row) in data[top * stride..bottom * stride]
++        .chunks_exact_mut(stride)
++        .enumerate()
++    {
++        // Engine clip masks are non-antialiased axis-aligned rectangles (0/255).
++        let (begin, finish) = if let Some(mask) = mask {
++            let line = &mask.data()
++                [(top + index) * width as usize + start..(top + index) * width as usize + end];
++            let Some(first) = line.iter().position(|v| *v == 255) else {
++                continue;
++            };
++            let last = line.iter().rposition(|v| *v == 255).unwrap();
++            (start + first, start + last + 1)
++        } else {
++            (start, end)
++        };
++        let target = &mut row[begin * 4..finish * 4];
++        if let Ok(words) = bytemuck::try_cast_slice_mut::<u8, u32>(target) {
++            words.fill(pixel);
++        } else {
++            for bytes in target.chunks_exact_mut(4) {
++                bytes.copy_from_slice(&pixel.to_ne_bytes());
++            }
++        }
++    }
++    if top > 0 {
++        let clipped = mask.map(|m| {
++            tiny_skia::Mask::from_vec(
++                m.data()[..top * width as usize].to_vec(),
++                tiny_skia::IntSize::from_wh(width, top as u32).unwrap(),
++            )
++            .unwrap()
++        });
++        let mut band =
++            tiny_skia::PixmapMut::from_bytes(&mut data[..top * stride], width, top as u32).unwrap();
++        band.fill_path(
++            &physical,
++            &paint,
++            tiny_skia::FillRule::EvenOdd,
++            tiny_skia::Transform::identity(),
++            clipped.as_ref(),
++        );
++    }
++    if bottom < height as usize {
++        let clipped = mask.map(|m| {
++            tiny_skia::Mask::from_vec(
++                m.data()[bottom * width as usize..].to_vec(),
++                tiny_skia::IntSize::from_wh(width, height - bottom as u32).unwrap(),
++            )
++            .unwrap()
++        });
++        let mut band = tiny_skia::PixmapMut::from_bytes(
++            &mut data[bottom * stride..],
++            width,
++            height - bottom as u32,
++        )
++        .unwrap();
++        band.fill_path(
++            &physical,
++            &paint,
++            tiny_skia::FillRule::EvenOdd,
++            tiny_skia::Transform::from_translate(0.0, -(bottom as f32)),
++            clipped.as_ref(),
++        );
++    }
++    true
++}
++#[cfg(test)]
++mod renderer_fill_tests {
++    use super::*;
++    #[test]
++    fn opaque_interior_matches_reference_pixels() {
++        for scale in [1.0_f32, 1.25, 1.5, 2.0] {
++            for y in [3.0_f32, 3.25, 3.5, 3.75] {
++                for radius in [0.0_f32, 2.0, 6.0, 15.0] {
++                    let bounds = Rectangle {
++                        x: 8.0,
++                        y,
++                        width: 96.0,
++                        height: 46.0,
++                    };
++                    let transform = tiny_skia::Transform::from_scale(scale, scale);
++                    let physical = Rectangle {
++                        x: 8.0 * scale,
++                        y: y * scale,
++                        width: 96.0 * scale,
++                        height: 46.0 * scale,
++                    };
++                    let path = rounded_rectangle(bounds, [radius; 4]);
++                    let color = Color::from_rgb8(39, 48, 61);
++                    let mut actual = tiny_skia::Pixmap::new(240, 160).unwrap();
++                    actual.fill(tiny_skia::Color::from_rgba8(15, 22, 31, 255));
++                    let mut expected = actual.clone();
++                    let fast = fill_solid_interior(
++                        &mut actual.as_mut(),
++                        &path,
++                        transform,
++                        physical,
++                        radius * scale,
++                        color,
++                        None,
++                        Rectangle {
++                            x: 0.0,
++                            y: 0.0,
++                            width: 240.0,
++                            height: 160.0,
++                        },
++                    );
++                    assert!(fast);
++                    expected.fill_path(
++                        &path,
++                        &tiny_skia::Paint {
++                            shader: tiny_skia::Shader::SolidColor(into_color(color)),
++                            anti_alias: true,
++                            ..Default::default()
++                        },
++                        tiny_skia::FillRule::EvenOdd,
++                        transform,
++                        None,
++                    );
++                    assert!(
++                        actual.data() == expected.data(),
++                        "scale={scale} y={y} radius={radius}"
++                    );
++                }
++            }
++        }
++    }
++}
++
++#[cfg(test)]
++mod renderer_clipped_fill_tests {
++    use super::*;
++    #[test]
++    fn clipped_opaque_interiors_match_reference() {
++        for scale in [1.0_f32, 1.25, 1.5, 2.0] {
++            for y in [-25.75_f32, 3.25, 89.875] {
++                for clip in [
++                    Rectangle {
++                        x: 0.0,
++                        y: 0.0,
++                        width: 240.0,
++                        height: 160.0,
++                    },
++                    Rectangle {
++                        x: 12.25,
++                        y: 7.75,
++                        width: 180.5,
++                        height: 133.25,
++                    },
++                ] {
++                    let bounds = Rectangle {
++                        x: 8.0,
++                        y,
++                        width: 96.0,
++                        height: 120.0,
++                    };
++                    let radii = [2.0, 6.0, 15.0, 0.0];
++                    let path = rounded_rectangle(bounds, radii);
++                    let transform = tiny_skia::Transform::from_scale(scale, scale);
++                    let physical = Rectangle {
++                        x: 8.0 * scale,
++                        y: y * scale,
++                        width: 96.0 * scale,
++                        height: 120.0 * scale,
++                    };
++                    let color = Color::from_rgb8(39, 48, 61);
++                    let mut actual = tiny_skia::Pixmap::new(240, 160).unwrap();
++                    actual.fill(tiny_skia::Color::from_rgba8(15, 22, 31, 255));
++                    let mut expected = actual.clone();
++                    let mut mask = tiny_skia::Mask::new(240, 160).unwrap();
++                    adjust_clip_mask(&mut mask, clip);
++                    if fill_solid_interior(
++                        &mut actual.as_mut(),
++                        &path,
++                        transform,
++                        physical,
++                        15.0 * scale,
++                        color,
++                        Some(&mask),
++                        clip,
++                    ) {
++                        expected.fill_path(
++                            &path,
++                            &tiny_skia::Paint {
++                                shader: tiny_skia::Shader::SolidColor(into_color(color)),
++                                anti_alias: true,
++                                ..Default::default()
++                            },
++                            tiny_skia::FillRule::EvenOdd,
++                            transform,
++                            Some(&mask),
++                        );
++                        assert!(
++                            actual.data() == expected.data(),
++                            "scale={scale} y={y} clip={clip:?}"
++                        );
++                    } else {
++                        assert!(actual.data() == expected.data());
++                    }
++                }
++            }
++        }
++    }
++}
+--- a/src/window/compositor.rs
++++ b/src/window/compositor.rs
+@@ -14,10 +14,7 @@
+ }
+ 
+ pub struct Surface {
+-    window: softbuffer::Surface<
+-        Box<dyn compositor::Display>,
+-        Box<dyn compositor::Window>,
+-    >,
++    window: softbuffer::Surface<Box<dyn compositor::Display>, Box<dyn compositor::Window>>,
+     clip_mask: tiny_skia::Mask,
+     layer_stack: VecDeque<Vec<Layer>>,
+     background_color: Color,
+@@ -36,9 +33,7 @@
+         backend: Option<&str>,
+     ) -> Result<Self, Error> {
+         match backend {
+-            None | Some("tiny-skia") | Some("tiny_skia") => {
+-                Ok(new(settings.into(), display))
+-            }
++            None | Some("tiny-skia") | Some("tiny_skia") => Ok(new(settings.into(), display)),
+             Some(backend) => Err(Error::GraphicsAdapterNotFound {
+                 backend: "tiny-skia",
+                 reason: error::Reason::DidNotMatch {
+@@ -49,10 +44,7 @@
+     }
+ 
+     fn create_renderer(&self) -> Self::Renderer {
+-        Renderer::new(
+-            self.settings.default_font,
+-            self.settings.default_text_size,
+-        )
++        Renderer::new(self.settings.default_font, self.settings.default_text_size)
+     }
+ 
+     fn create_surface<W: compositor::Window + Clone>(
+@@ -61,11 +53,8 @@
+         width: u32,
+         height: u32,
+     ) -> Self::Surface {
+-        let window = softbuffer::Surface::new(
+-            &self.context,
+-            Box::new(window.clone()) as _,
+-        )
+-        .expect("Create softbuffer surface for window");
++        let window = softbuffer::Surface::new(&self.context, Box::new(window.clone()) as _)
++            .expect("Create softbuffer surface for window");
+ 
+         let mut surface = Surface {
+             window,
+@@ -82,12 +71,7 @@
+         surface
+     }
+ 
+-    fn configure_surface(
+-        &mut self,
+-        surface: &mut Self::Surface,
+-        width: u32,
+-        height: u32,
+-    ) {
++    fn configure_surface(&mut self, surface: &mut Self::Surface, width: u32, height: u32) {
+         surface
+             .window
+             .resize(
+@@ -96,8 +80,7 @@
+             )
+             .expect("Resize surface");
+ 
+-        surface.clip_mask =
+-            tiny_skia::Mask::new(width, height).expect("Create clip mask");
++        surface.clip_mask = tiny_skia::Mask::new(width, height).expect("Create clip mask");
+         surface.layer_stack.clear();
+     }
+ 
+@@ -116,13 +99,16 @@
+         background_color: Color,
+         on_pre_present: impl FnOnce(),
+     ) -> Result<(), compositor::SurfaceError> {
+-        present(
++        let started = crate::profile::present_start();
++        let result = present(
+             renderer,
+             surface,
+             viewport,
+             background_color,
+             on_pre_present,
+-        )
++        );
++        crate::profile::present_end(started, viewport, result.is_ok());
++        result
+     }
+ 
+     fn screenshot(
+@@ -135,13 +121,10 @@
+     }
+ }
+ 
+-pub fn new(
+-    settings: Settings,
+-    display: impl compositor::Display,
+-) -> Compositor {
++pub fn new(settings: Settings, display: impl compositor::Display) -> Compositor {
+     #[allow(unsafe_code)]
+-    let context = softbuffer::Context::new(Box::new(display) as _)
+-        .expect("Create softbuffer context");
++    let context =
++        softbuffer::Context::new(Box::new(display) as _).expect("Create softbuffer context");
+ 
+     Compositor { context, settings }
+ }
+@@ -194,10 +177,8 @@
+         surface.layer_stack.push_front(renderer.layers().to_vec());
+         surface.background_color = background_color;
+ 
+-        let damage = damage::group(
+-            damage,
+-            Rectangle::with_size(viewport.logical_size()),
+-        );
++        let damage = damage::group(damage, Rectangle::with_size(viewport.logical_size()));
++        let damage = coalesce_damage(damage);
+ 
+         let mut pixels = tiny_skia::PixmapMut::from_bytes(
+             bytemuck::cast_slice_mut(&mut buffer),
+@@ -226,11 +207,9 @@
+ ) -> Vec<u8> {
+     let size = viewport.physical_size();
+ 
+-    let mut offscreen_buffer: Vec<u32> =
+-        vec![0; size.width as usize * size.height as usize];
+-
+-    let mut clip_mask = tiny_skia::Mask::new(size.width, size.height)
+-        .expect("Create clip mask");
++    let mut offscreen_buffer: Vec<u32> = vec![0; size.width as usize * size.height as usize];
++
++    let mut clip_mask = tiny_skia::Mask::new(size.width, size.height).expect("Create clip mask");
+ 
+     renderer.draw(
+         &mut tiny_skia::PixmapMut::from_bytes(
+@@ -266,3 +245,40 @@
+         },
+     )
+ }
++
++/// Repaint a superset of fragmented damage in one pass; pixel content is unchanged.
++/// The original behavior is selectable only during opt-in profiling comparisons.
++pub fn coalesce_damage(damage: Vec<Rectangle>) -> Vec<Rectangle> {
++    if damage.len() > 4 && !crate::profile::uncached() {
++        vec![
++            damage
++                .iter()
++                .skip(1)
++                .fold(damage[0], |bounds, r| bounds.union(r)),
++        ]
++    } else {
++        damage
++    }
++}
++#[cfg(test)]
++mod renderer_damage_tests {
++    use super::*;
++    #[test]
++    fn coalesced_damage_contains_every_original_region() {
++        let rects: Vec<_> = (0..10)
++            .map(|i| Rectangle {
++                x: 10.0,
++                y: i as f32 * 7.0,
++                width: 40.0,
++                height: 7.0,
++            })
++            .collect();
++        let grouped = coalesce_damage(rects.clone());
++        assert_eq!(grouped.len(), 1);
++        for rect in rects {
++            assert!(rect.is_within(&grouped[0]));
++        }
++        assert!(coalesce_damage(Vec::new()).is_empty());
++        assert_eq!(coalesce_damage(vec![grouped[0]]), grouped);
++    }
++}
+--- a/src/text.rs
++++ b/src/text.rs
+@@ -126,9 +126,7 @@
+         let height = entry.min_bounds.height;
+ 
+         let x = match align_x {
+-            Alignment::Default | Alignment::Left | Alignment::Justified => {
+-                bounds.x
+-            }
++            Alignment::Default | Alignment::Left | Alignment::Justified => bounds.x,
+             Alignment::Center => bounds.x - width / 2.0,
+             Alignment::Right => bounds.x - width,
+         };
+@@ -196,10 +194,8 @@
+ 
+     for run in buffer.layout_runs() {
+         for glyph in run.glyphs {
+-            let physical_glyph = glyph.physical(
+-                (position.x, position.y),
+-                transformation.scale_factor(),
+-            );
++            let physical_glyph =
++                glyph.physical((position.x, position.y), transformation.scale_factor());
+ 
+             if let Some((buffer, placement)) = glyph_cache.allocate(
+                 physical_glyph.cache_key,
+@@ -207,24 +203,25 @@
+                 font_system,
+                 &mut swash,
+             ) {
+-                let pixmap = tiny_skia::PixmapRef::from_bytes(
+-                    buffer,
+-                    placement.width,
+-                    placement.height,
+-                )
+-                .expect("Create glyph pixel map");
+-
+-                let opacity = color.a
+-                    * glyph
+-                        .color_opt
+-                        .map(|c| c.a() as f32 / 255.0)
+-                        .unwrap_or(1.0);
+-
++                let pixmap =
++                    tiny_skia::PixmapRef::from_bytes(buffer, placement.width, placement.height)
++                        .expect("Create glyph pixel map");
++
++                let opacity =
++                    color.a * glyph.color_opt.map(|c| c.a() as f32 / 255.0).unwrap_or(1.0);
++
++                let x = physical_glyph.x + placement.left;
++                let y = physical_glyph.y - placement.top
++                    + (run.line_y * transformation.scale_factor()).round() as i32;
++                if opacity == 1.0
++                    && !crate::profile::reference_raster()
++                    && blit_glyph(pixels, pixmap, x, y, clip_mask)
++                {
++                    continue;
++                }
+                 pixels.draw_pixmap(
+-                    physical_glyph.x + placement.left,
+-                    physical_glyph.y - placement.top
+-                        + (run.line_y * transformation.scale_factor()).round()
+-                            as i32,
++                    x,
++                    y,
+                     pixmap,
+                     &tiny_skia::PixmapPaint {
+                         opacity,
+@@ -246,10 +243,8 @@
+ 
+ #[derive(Debug, Clone, Default)]
+ struct GlyphCache {
+-    entries: FxHashMap<
+-        (cosmic_text::CacheKey, [u8; 3]),
+-        (Vec<u32>, cosmic_text::Placement),
+-    >,
++    entries:
++        FxHashMap<(cosmic_text::CacheKey, [u8; 3]), Option<(Vec<u32>, cosmic_text::Placement)>>,
+     recently_used: FxHashSet<(cosmic_text::CacheKey, [u8; 3])>,
+     trim_count: usize,
+ }
+@@ -272,14 +267,23 @@
+         let [r, g, b, _a] = color.into_rgba8();
+         let key = (cache_key, [r, g, b]);
+ 
++        let _ = self.recently_used.insert(key);
+         if let hash_map::Entry::Vacant(entry) = self.entries.entry(key) {
+             // TODO: Outline support
+-            let image = swash.get_image_uncached(font_system, cache_key)?;
+-
+-            let glyph_size = image.placement.width as usize
+-                * image.placement.height as usize;
++            let Some(image) = swash.get_image_uncached(font_system, cache_key) else {
++                // Whitespace and other non-rendering glyphs must also be cached.
++                if !crate::profile::reference_raster() {
++                    let _ = entry.insert(None);
++                }
++                return None;
++            };
++
++            let glyph_size = image.placement.width as usize * image.placement.height as usize;
+ 
+             if glyph_size == 0 {
++                if !crate::profile::reference_raster() {
++                    let _ = entry.insert(None);
++                }
+                 return None;
+             }
+ 
+@@ -294,13 +298,7 @@
+                     for _y in 0..image.placement.height {
+                         for _x in 0..image.placement.width {
+                             buffer[i] = bytemuck::cast(
+-                                tiny_skia::ColorU8::from_rgba(
+-                                    b,
+-                                    g,
+-                                    r,
+-                                    image.data[i],
+-                                )
+-                                .premultiply(),
++                                tiny_skia::ColorU8::from_rgba(b, g, r, image.data[i]).premultiply(),
+                             );
+ 
+                             i += 1;
+@@ -332,19 +330,19 @@
+                 }
+             }
+ 
+-            let _ = entry.insert((buffer, image.placement));
++            let _ = entry.insert(Some((buffer, image.placement)));
+         }
+ 
+         let _ = self.recently_used.insert(key);
+ 
+-        self.entries.get(&key).map(|(buffer, placement)| {
+-            (bytemuck::cast_slice(buffer.as_slice()), *placement)
+-        })
++        self.entries
++            .get(&key)
++            .and_then(|value| value.as_ref())
++            .map(|(buffer, placement)| (bytemuck::cast_slice(buffer.as_slice()), *placement))
+     }
+ 
+     pub fn trim(&mut self) {
+-        if self.trim_count > Self::TRIM_INTERVAL
+-            || self.recently_used.len() >= Self::CAPACITY_LIMIT
++        if self.trim_count > Self::TRIM_INTERVAL || self.recently_used.len() >= Self::CAPACITY_LIMIT
+         {
+             self.entries
+                 .retain(|key, _| self.recently_used.contains(key));
+@@ -360,3 +358,107 @@
+         }
+     }
+ }
++
++// Premultiplied source-over for an integer-positioned, unscaled glyph. This
++// preserves the software rasterizer's float arithmetic and nearest-even output
++// rounding without building a general image-sampling pipeline for every glyph.
++fn blit_glyph(
++    pixels: &mut tiny_skia::PixmapMut<'_>,
++    glyph: tiny_skia::PixmapRef<'_>,
++    x: i32,
++    y: i32,
++    mask: Option<&tiny_skia::Mask>,
++) -> bool {
++    if x < 0 || y < 0 {
++        return false;
++    }
++    let width = pixels.width() as usize;
++    let height = pixels.height() as usize;
++    let left = (x as i64).max(0).min(width as i64) as usize;
++    let top = (y as i64).max(0).min(height as i64) as usize;
++    let right = (x as i64 + glyph.width() as i64).max(0).min(width as i64) as usize;
++    let bottom = (y as i64 + glyph.height() as i64).max(0).min(height as i64) as usize;
++    if right <= left || bottom <= top {
++        return true;
++    }
++    let source = glyph.data();
++    let destination = pixels.data_mut();
++    const FACTOR: f32 = 1.0 / 255.0;
++    for row in top..bottom {
++        let source_start = ((row as i64 - y as i64) as usize * glyph.width() as usize
++            + (left as i64 - x as i64) as usize)
++            * 4;
++        let target_start = (row * width + left) * 4;
++        let src = &source[source_start..source_start + (right - left) * 4];
++        let dst = &mut destination[target_start..target_start + (right - left) * 4];
++        for (column, (s, d)) in src.chunks_exact(4).zip(dst.chunks_exact_mut(4)).enumerate() {
++            let coverage = mask
++                .map(|m| m.data()[row * width + left + column])
++                .unwrap_or(255);
++            if coverage == 0 || s[3] == 0 {
++                continue;
++            }
++            let coverage = coverage as f32 / 255.0;
++            let alpha = (s[3] as f32 * FACTOR) * coverage;
++            let inverse = 1.0 - alpha;
++            for channel in 0..4 {
++                let source = (s[channel] as f32 * FACTOR) * coverage;
++                let target = d[channel] as f32 * FACTOR;
++                d[channel] =
++                    ((target * inverse + source).clamp(0.0, 1.0) * 255.0).round_ties_even() as u8;
++            }
++        }
++    }
++    true
++}
++#[cfg(test)]
++mod renderer_glyph_tests {
++    use super::*;
++    #[test]
++    fn direct_glyph_blending_matches_reference() {
++        for w in [7, 17, 256] {
++            for (x, y) in [(3, 4), (-3, -4), (9, 11)] {
++                for clipped in [false, true] {
++                    let mut source = tiny_skia::Pixmap::new(w, 19).unwrap();
++                    for (i, p) in source.data_mut().chunks_exact_mut(4).enumerate() {
++                        let alpha = (i % 256) as u8;
++                        p.copy_from_slice(&[alpha / 2, alpha / 3, alpha, alpha]);
++                    }
++                    let mut actual = tiny_skia::Pixmap::new(270, 40).unwrap();
++                    for (i, p) in actual.data_mut().chunks_exact_mut(4).enumerate() {
++                        let alpha = (i % 256) as u8;
++                        p.copy_from_slice(&[alpha / 2, alpha / 4, alpha / 3, alpha]);
++                    }
++                    let mut expected = actual.clone();
++                    let mut mask = tiny_skia::Mask::new(270, 40).unwrap();
++                    for (i, p) in mask.data_mut().iter_mut().enumerate() {
++                        *p = if i % 3 == 0 { 0 } else { 255 };
++                    }
++                    let mask = clipped.then_some(&mask);
++                    if !blit_glyph(&mut actual.as_mut(), source.as_ref(), x, y, mask) {
++                        actual.draw_pixmap(
++                            x,
++                            y,
++                            source.as_ref(),
++                            &tiny_skia::PixmapPaint::default(),
++                            tiny_skia::Transform::identity(),
++                            mask,
++                        );
++                    }
++                    expected.draw_pixmap(
++                        x,
++                        y,
++                        source.as_ref(),
++                        &tiny_skia::PixmapPaint::default(),
++                        tiny_skia::Transform::identity(),
++                        mask,
++                    );
++                    assert!(
++                        actual.data() == expected.data(),
++                        "width={w} x={x} y={y} clipped={clipped}"
++                    );
++                }
++            }
++        }
++    }
++}
+--- /dev/null
++++ b/src/profile.rs
+@@ -0,0 +1,163 @@
++// SPDX-License-Identifier: MIT
++//! Opt-in local presentation measurements; no network or UI changes.
++use std::{
++    fs::{File, OpenOptions},
++    io::{BufWriter, Write},
++    sync::{Mutex, OnceLock},
++    time::Instant,
++};
++#[derive(Default)]
++struct Frame {
++    draw_ms: f64,
++    fills: u64,
++    skips: u64,
++    damage: usize,
++    stages: [f64; 6],
++}
++struct Trace {
++    file: BufWriter<File>,
++    epoch: Instant,
++    frame: Frame,
++    last_input: Option<Instant>,
++    input_seq: u64,
++    input_kind: &'static str,
++    foreground: bool,
++    uncached: bool,
++}
++static TRACE: OnceLock<Option<Mutex<Trace>>> = OnceLock::new();
++fn trace() -> Option<&'static Mutex<Trace>> {
++    TRACE
++        .get_or_init(|| {
++            let path = std::env::var_os("FILE_BEHOLDER_PRESENT_TRACE")?;
++            let file = OpenOptions::new()
++                .write(true)
++                .create_new(true)
++                .open(path)
++                .ok()?;
++            Some(Mutex::new(Trace {
++                file: BufWriter::new(file),
++                epoch: Instant::now(),
++                frame: Frame::default(),
++                last_input: None,
++                input_seq: 0,
++                input_kind: "none",
++                foreground: false,
++                uncached: std::env::var_os("FILE_BEHOLDER_UNCACHED_CLIP_MASK").is_some(),
++            }))
++        })
++        .as_ref()
++}
++pub fn enabled() -> bool {
++    trace().is_some()
++}
++pub fn uncached() -> bool {
++    trace().is_some_and(|t| t.lock().map(|t| t.uncached).unwrap_or(false))
++}
++pub fn input(kind: &'static str) {
++    if let Some(t) = trace() {
++        if let Ok(mut t) = t.lock() {
++            t.input_seq += 1;
++            t.input_kind = kind;
++            t.last_input = Some(Instant::now());
++        }
++    }
++}
++pub fn draw_start() -> Option<Instant> {
++    enabled().then(Instant::now)
++}
++pub fn draw_end(at: Option<Instant>, (fills, skips): (u64, u64), damage: usize) {
++    if let (Some(at), Some(t)) = (at, trace()) {
++        if let Ok(mut t) = t.lock() {
++            t.frame.draw_ms = at.elapsed().as_secs_f64() * 1000.0;
++            t.frame.fills = fills;
++            t.frame.skips = skips;
++            t.frame.damage = damage;
++        }
++    }
++}
++pub fn present_start() -> Option<Instant> {
++    if let Some(t) = trace() {
++        if let Ok(mut t) = t.lock() {
++            t.frame = Frame::default();
++        }
++        Some(Instant::now())
++    } else {
++        None
++    }
++}
++pub fn present_end(at: Option<Instant>, viewport: &crate::graphics::Viewport, ok: bool) {
++    if let (Some(at), Some(t)) = (at, trace()) {
++        if let Ok(mut t) = t.lock() {
++            let ended = Instant::now();
++            let present_ms = ended.duration_since(at).as_secs_f64() * 1000.0;
++            let elapsed_ms = ended.duration_since(t.epoch).as_secs_f64() * 1000.0;
++            let input_age_ms = t
++                .last_input
++                .map(|i| ended.duration_since(i).as_secs_f64() * 1000.0)
++                .unwrap_or(0.0);
++            let f = &t.frame;
++            let seq = t.input_seq;
++            let kind = t.input_kind;
++            let [quads, primitives, images, text, fill, border] = t.frame.stages;
++            let line = format!(
++                "{{\"elapsed_ms\":{elapsed_ms},\"fill_ms\":{fill},\"border_ms\":{border},\"quads_ms\":{quads},\"primitives_ms\":{primitives},\"images_ms\":{images},\"text_ms\":{text},\"present_ms\":{present_ms},\"raster_ms\":{},\"clip_fills\":{},\"clip_skips\":{},\"damage_regions\":{},\"width\":{},\"height\":{},\"scale\":{},\"input_seq\":{seq},\"input_kind\":\"{kind}\",\"input_age_ms\":{input_age_ms},\"ok\":{ok}}}\n",
++                f.draw_ms,
++                f.fills,
++                f.skips,
++                f.damage,
++                viewport.physical_size().width,
++                viewport.physical_size().height,
++                viewport.scale_factor()
++            );
++            let _ = t.file.write_all(line.as_bytes());
++            let _ = t.file.flush();
++        }
++    }
++}
++
++pub fn focus(value: bool) {
++    if let Some(t) = trace() {
++        if let Ok(mut t) = t.lock() {
++            t.foreground = value;
++        }
++    }
++}
++pub fn foreground() -> bool {
++    trace().is_some_and(|t| t.lock().map(|t| t.foreground).unwrap_or(false))
++}
++
++pub struct Stage(Option<(Instant, usize)>);
++pub fn stage(name: &str) -> Stage {
++    Stage(if enabled() {
++        Some((
++            Instant::now(),
++            match name {
++                "quads" => 0,
++                "primitives" => 1,
++                "images" => 2,
++                "fill" => 4,
++                "border" => 5,
++                _ => 3,
++            },
++        ))
++    } else {
++        None
++    })
++}
++impl Drop for Stage {
++    fn drop(&mut self) {
++        if let Some((at, index)) = self.0 {
++            let ms = at.elapsed().as_secs_f64() * 1000.0;
++            if let Some(t) = trace() {
++                if let Ok(mut t) = t.lock() {
++                    t.frame.stages[index] += ms;
++                }
++            }
++        }
++    }
++}
++
++pub fn reference_raster() -> bool {
++    static FLAG: OnceLock<bool> = OnceLock::new();
++    *FLAG.get_or_init(|| enabled() && std::env::var_os("FILE_BEHOLDER_REFERENCE_RASTER").is_some())
++}

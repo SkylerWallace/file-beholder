@@ -1,0 +1,21 @@
+sk-iced
+Shared code extracted from File Beholder and PC Tonic.
+PC Tonic copyright 2026 PC Tonic contributors. Theme and palette retain Apache-2.0 provenance. Motion policy is derived from File Beholder (MIT). Original notices are retained below.
+
+PC Tonic
+Copyright 2026 PC Tonic contributors
+
+PC Tonic source code and owned assets are licensed under Apache-2.0.
+Third-party components retain their own licenses and copyrights.
+See THIRD_PARTY_NOTICES.md and the accompanying licenses/source materials.
+
+File Beholder also adapts src/ui/iced/native_services/desktop.rs completion notification and WAV playback, and includes assets/audio/warm_confirm.wav from PC Tonic.
+
+Reusable animation primitives/widgets were extracted from File Beholder (MIT). The drawer width controller and its easing were extracted from PC Tonic (Apache-2.0). Application-specific operations and diagnostic code are not part of this library.
+
+Reusable structural controls and typography adapters were extracted/adapted from the Apache-2.0 PC Tonic and File Beholder UI kit. App-specific file-manager and diagnostic views remain in their applications.
+
+Shared typography, logical-DIP design tokens and icon presentation/cache helpers retain the existing app-owned asset provenance. Raster resizing uses the already-pinned image 0.25.8 crate (MIT OR Apache-2.0); this library enables no image codecs. Artwork and font files remain app-owned and are not redistributed by sk-iced.
+Stage-two cached viewports, column header/resize gestures, selection and tree navigation adapt File Beholder code (MIT; copyright 2026 File Beholder contributors). New data-component builders retain Apache-2.0 provenance. Domain-specific models, workers and assets remain app-owned. No additional dependency is introduced.
+Stage-three split geometry, tab viewport/surface, responsive toolbar measurement, drag markers/collection and drop painting retain File Beholder MIT provenance (copyright 2026 File Beholder contributors). New navigation/toolbar composition is Apache-2.0. App-owned routes, workspace/file transactions and diagnostic reorder snapshots remain local. No new dependency is introduced.
+Stage-four form/feedback/viewer composition, labeled progress and the component catalog are Apache-2.0. ShareMeter, FillClip, ResizeGrip and the transparent interaction-gate foundation retain File Beholder MIT provenance (copyright 2026 File Beholder contributors). The selectable viewer retains the existing PC Tonic software-renderer presentation. App-owned content, validation, reports and actions remain local. No new dependency is introduced.

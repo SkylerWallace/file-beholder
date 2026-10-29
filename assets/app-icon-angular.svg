@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">File Beholder</title>
+  <desc id="description">An angular amber folder forms an open eye around a notched teal pupil.</desc>
+  <defs>
+    <linearGradient id="upper-flap" x1="145" y1="40" x2="360" y2="255" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffca35"/>
+      <stop offset="1" stop-color="#ffb923"/>
+    </linearGradient>
+    <linearGradient id="upper-fold" x1="32" y1="84" x2="220" y2="270" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e69b12"/>
+      <stop offset="1" stop-color="#d98a0b"/>
+    </linearGradient>
+    <linearGradient id="fold-edge" x1="242" y1="172" x2="486" y2="255" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#d88a0d"/>
+      <stop offset="1" stop-color="#c47b08"/>
+    </linearGradient>
+    <linearGradient id="lower-flap" x1="130" y1="300" x2="380" y2="460" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffc932"/>
+      <stop offset="1" stop-color="#ffbb23"/>
+    </linearGradient>
+    <linearGradient id="lower-fold" x1="36" y1="300" x2="250" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#eaa019"/>
+      <stop offset="1" stop-color="#dc8b0b"/>
+    </linearGradient>
+    <linearGradient id="right-fold" x1="475" y1="282" x2="320" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e69b15"/>
+      <stop offset="1" stop-color="#df9111"/>
+    </linearGradient>
+    <linearGradient id="pupil" x1="210" y1="205" x2="310" y2="355" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#104c53"/>
+      <stop offset="1" stop-color="#0a4148"/>
+    </linearGradient>
+  </defs>
+  <path id="eye" fill="#fff" d="M40 254.724 242 172 467 244.848V285.706L257 383 40 295.236Z"/>
+  <g id="upper-folder">
+    <path fill="url(#upper-fold)" d="M32 84 242 172 32 258Z"/>
+    <path fill="url(#upper-flap)" d="M32 84 79 40 215 49 248 92 435 106 486 192 486 251 242 172Z"/>
+    <path id="upper-fold-edge" fill="url(#fold-edge)" d="M242 172 486 251 486 253 Q486 257 482 255Z"/>
+  </g>
+  <g id="lower-folder">
+    <path fill="url(#lower-flap)" d="M32 292 257 383 475 282 476 351 446 432 63 468 32 430Z"/>
+    <path fill="url(#lower-fold)" d="M32 292 238 451 63 468 32 430Z"/>
+    <path fill="url(#right-fold)" d="M257 383 475 282 476 351 446 432Z"/>
+  </g>
+  <path id="notched-pupil" fill="url(#pupil)" d="M310 216 A84 84 0 1 0 335 251 L264 276Z"/>
+</svg>

@@ -1,0 +1,38 @@
+[package]
+name = "file-beholder"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A Windows multi-panel file manager built with Rust and Iced"
+license = "MIT"
+
+[dependencies]
+sk-iced = { version = "=0.1.0", git = "https://github.com/SkylerWallace/sk-iced", rev = "9b07703f15d44abf82622851aa68385749d2274e", features = ["animations", "svg", "components", "icons"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+blake3 = "1.8"
+iced = { version = "=0.14.0", default-features = false, features = ["tiny-skia", "crisp", "thread-pool", "fira-sans", "advanced", "image-without-codecs", "svg"] }
+iced_tiny_skia = { version = "=0.14.1", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Time", "Win32_System_Threading", "Win32_System_Registry", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_UI_Shell_PropertiesSystem", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_LibraryLoader", "Win32_UI_Accessibility", "Win32_UI_Controls_Dialogs", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
+
+[patch.crates-io]
+iced_tiny_skia = { path = "vendor/iced_tiny_skia" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release.package.tiny-skia]
+opt-level = 3
+[profile.release.package.tiny-skia-path]
+opt-level = 3
+[profile.release.package.iced_tiny_skia]
+opt-level = 3
+
+[dev-dependencies]
+tiny-skia = "=0.11.4"

@@ -1,0 +1,30 @@
+{
+  "name": "iced_tiny_skia",
+  "version": "0.14.1",
+  "upstream_sha256": "c267596d742714b1853cc10c3983a367762816fc4836bd3b79f76ce76787d6f8",
+  "upstream_url": "https://crates.io/api/v1/crates/iced_tiny_skia/0.14.1/download",
+  "patch": "iced_tiny_skia-0.14.1.patch",
+  "patch_sha256": "c49ad2a73a485bf7c927cfbb7bb173728ad5cafdb4899014549bb470d76c9c04",
+  "files": {
+    "src/lib.rs": {
+      "before": "7e92fe50c473b57a433cb82fd9a866b0a5be11c2b79844c82fe26d816011a486",
+      "after": "b9d77e34ba0da372f2cb4bcbab15c2b438ee2d1929f6b7796e732c7f8994cdbc"
+    },
+    "src/engine.rs": {
+      "before": "e127c9156b39ce8f355f81aeae2dba3417b60623ce48ceabd50367b3c3456f13",
+      "after": "2f83b61e6ef6391604725101f2feeddc8733f8eeb52260da75f55eb39ccf97cb"
+    },
+    "src/window/compositor.rs": {
+      "before": "39c7857c67ef73994515ceb4a37aed16ff845609ce7cb89c494387770c1da46c",
+      "after": "6d814b1b6305d46bc39321f3cdb96ac312261d087d510f8d0496efa847d64596"
+    },
+    "src/text.rs": {
+      "before": "35a355932757ec896551a9ef2b4c8bdca4e1a9153dd176f059d6fada1c37d9cb",
+      "after": "ce266d3c9d45469cef8adacc1c1e5fc2655e8eef28fc45539e5005e07661091c"
+    },
+    "src/profile.rs": {
+      "before": null,
+      "after": "4c72b4db1d447d594f3066ce0d53ab8585cd424911dd6be70225f2326d5dacef"
+    }
+  }
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "package": "clipboard-win",
+    "version": "5.4.1",
+    "file": "clipboard-win-5.4.1-LICENSE",
+    "url": "https://raw.githubusercontent.com/DoumanAsh/clipboard-win/3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342/LICENSE",
+    "commit": "3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342",
+    "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+  },
+  {
+    "package": "iced_core",
+    "version": "0.14.0",
+    "file": "iced_core-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_debug",
+    "version": "0.14.0",
+    "file": "iced_debug-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_futures",
+    "version": "0.14.0",
+    "file": "iced_futures-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_graphics",
+    "version": "0.14.0",
+    "file": "iced_graphics-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_program",
+    "version": "0.14.0",
+    "file": "iced_program-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_renderer",
+    "version": "0.14.0",
+    "file": "iced_renderer-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_runtime",
+    "version": "0.14.0",
+    "file": "iced_runtime-0.14.0-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE",
+    "commit": "3997291f318a8bc06fa522f5579836fb3feb94df",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_widget",
+    "version": "0.14.2",
+    "file": "iced_widget-0.14.2-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/54abf81d13fec06d4d9ac754b03ce2c3313e8a1f/LICENSE",
+    "commit": "54abf81d13fec06d4d9ac754b03ce2c3313e8a1f",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "iced_winit",
+    "version": "0.14.1",
+    "file": "iced_winit-0.14.1-LICENSE",
+    "url": "https://raw.githubusercontent.com/iced-rs/iced/38237dd294da3256c2ac4d3f8288fc73956c91e0/LICENSE",
+    "commit": "38237dd294da3256c2ac4d3f8288fc73956c91e0",
+    "sha256": "fc9086ba4eba4b77e4c603906362742bc3715ffa2c7810c6074fe7780d3a0398"
+  },
+  {
+    "package": "zune-core",
+    "version": "0.4.12",
+    "file": "zune-core-0.4.12-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/etemesi254/zune-image/f8fbb123d5ed04441e8324a555bfcda0cb1bd28f/LICENSE.md",
+    "commit": "f8fbb123d5ed04441e8324a555bfcda0cb1bd28f",
+    "sha256": "c6dff146a9f31848ac296faa5a08a4253caf2c384c86f906dc99e7fc0a39cc8c"
+  },
+  {
+    "package": "zune-core",
+    "version": "0.4.12",
+    "file": "zune-core-0.4.12-LICENSE-ZLIB",
+    "url": "https://raw.githubusercontent.com/etemesi254/zune-image/f8fbb123d5ed04441e8324a555bfcda0cb1bd28f/LICENSE-ZLIB",
+    "commit": "f8fbb123d5ed04441e8324a555bfcda0cb1bd28f",
+    "sha256": "7fa429541e55b1509909e058f2d21a37467e4958ec713b357f6e0cf9dc4ee352"
+  },
+  {
+    "package": "zune-jpeg",
+    "version": "0.4.21",
+    "file": "zune-jpeg-0.4.21-LICENSE.md",
+    "url": "https://raw.githubusercontent.com/etemesi254/zune-image/fa2c767a01d7d9373911d0bf63e0588553d67e0e/LICENSE.md",
+    "commit": "fa2c767a01d7d9373911d0bf63e0588553d67e0e",
+    "sha256": "c6dff146a9f31848ac296faa5a08a4253caf2c384c86f906dc99e7fc0a39cc8c"
+  },
+  {
+    "package": "zune-jpeg",
+    "version": "0.4.21",
+    "file": "zune-jpeg-0.4.21-LICENSE-ZLIB",
+    "url": "https://raw.githubusercontent.com/etemesi254/zune-image/fa2c767a01d7d9373911d0bf63e0588553d67e0e/LICENSE-ZLIB",
+    "commit": "fa2c767a01d7d9373911d0bf63e0588553d67e0e",
+    "sha256": "7fa429541e55b1509909e058f2d21a37467e4958ec713b357f6e0cf9dc4ee352"
+  }
+]
