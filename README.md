@@ -2,6 +2,8 @@
 
 A fully portable file manager for Windows and Windows PE, built with Rust and Iced. Browse up to four panels, recover older files from shadow copies, and manage transfers through a shared ribbon and queue.
 
+[![Download for Windows](https://img.shields.io/badge/Download-Windows%20x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/SkylerWallace/file-beholder/releases/latest/download/file-beholder.exe)
+
 ![Default dark and light themes combined diagonally](docs/images/file-beholder-default-dark-light.png)
 
 <details>
