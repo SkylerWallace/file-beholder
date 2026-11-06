@@ -1,12 +1,20 @@
 # Third-party notices
 
-File Beholder's application-owned code, artwork, completion tones, and renderer extensions are covered by the project's MIT license. The components below retain their own licenses and attribution.
+File Beholder's application-owned code, artwork and completion tones are covered by the project's MIT license. The components below retain their own licenses and attribution.
 
 ## Iced and the software renderer
 
-The vendored `iced_tiny_skia` 0.14.1 renderer is upstream Iced code under MIT. Its original license is retained in `vendor/iced_tiny_skia/LICENSE`. The original registry checksum, baseline patch, and before/after source hashes are preserved in `vendor/renderer-patch`. File Beholder's later renderer refinements are maintained in the active vendored source.
+The shared renderer companion in `../sk-iced/renderer` contains upstream
+`iced_tiny_skia` 0.14.1 (MIT), File Beholder extensions (MIT), and PC Tonic additions
+and clipping oracles (Apache-2.0). Its original LICENSE, LICENSE-APACHE, NOTICE,
+input provenance, exact patch and file hashes are retained together. This does
+not relicense upstream Iced or File Beholder code. Both apps consume the same
+active source and regression support; independent renderer copies are retired.
 
-The opt-in `FILE_BEHOLDER_PRESENT_TRACE` environment variable records local presentation timings. Normal operation records no trace or telemetry.
+`SK_ICED_RENDERER_PRESENT_TRACE` enables opt-in local profiling; the legacy
+`FILE_BEHOLDER_PRESENT_TRACE` alias remains supported. Normal operation records
+no trace or telemetry. Source packages include the exact companion and rewrite
+Cargo paths to `vendor/shared-renderer` for standalone rebuilds.
 
 ## Dependency inventory
 

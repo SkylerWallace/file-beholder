@@ -18,7 +18,7 @@ iced_tiny_skia = { version = "=0.14.1", default-features = false }
 windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_Time", "Win32_System_Threading", "Win32_System_Registry", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_UI_Shell_PropertiesSystem", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_LibraryLoader", "Win32_UI_Accessibility", "Win32_UI_Controls_Dialogs", "Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 
 [patch.crates-io]
-iced_tiny_skia = { path = "vendor/iced_tiny_skia" }
+iced_tiny_skia = { path = "../sk-iced/renderer/iced_tiny_skia" }
 
 [profile.release]
 opt-level = "s"
@@ -36,3 +36,14 @@ opt-level = 3
 
 [dev-dependencies]
 tiny-skia = "=0.11.4"
+
+sk-iced-renderer-regression = { version = "=0.1.0", path = "../sk-iced/renderer/regression" }
+
+# Theme tokens and chained widget builders otherwise retain large temporary
+# copies in unoptimized frames. Keep debug symbols/checks while fitting the
+# default Windows test-thread stack (also used by sk-iced's gallery).
+[profile.dev.package.file-beholder]
+opt-level = 1
+
+[profile.dev.package.sk-iced]
+opt-level = 1

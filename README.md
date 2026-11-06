@@ -81,11 +81,11 @@ A fully portable file manager for Windows and Windows PE, built with Rust and Ic
 Use stable Rust 1.88 or newer on Windows. MSVC builds require Visual Studio Build Tools with **Desktop development with C++** and a Windows SDK. GNU builds require MinGW-w64 and `windres` on PATH.
 
 ```powershell
-cargo build --release --locked
-.\target\release\file-beholder.exe
+.\scripts\build.ps1
+.\dist\file-beholder-v0.1.0\file-beholder.exe
 ```
 
-No installation is required. Run the executable from a local folder or USB drive, including in Windows PE. Use a writable folder to save settings and imported sounds beside it. The pinned [sk-iced](https://github.com/SkylerWallace/sk-iced) dependency is fetched by Cargo; no sibling checkout is required.
+No installation is required. Run the executable from a local folder or USB drive, including in Windows PE. Use a writable folder to save settings and imported sounds beside it. The pinned [sk-iced](https://github.com/SkylerWallace/sk-iced) UI dependency is fetched by Cargo; keep its matching renderer companion checkout beside this repository (source exports include it internally).
 
 For build scripts, tests, and source packaging, see [Contributing](CONTRIBUTING.md) and [Validation](VALIDATION.md).
 
@@ -181,3 +181,14 @@ Windows is the supported platform. The checked-in Windows CI workflow is current
 File Beholder application code and owned assets are [MIT](LICENSE). Third-party components retain their original licenses and notices, including the MIT license for vendored Iced source.
 
 Dependency and font notices are embedded in the application and retained under [docs/licenses](docs/licenses/README.md). See [Third-party notices](THIRD_PARTY_NOTICES.md) for attribution and renderer provenance. Keep these licenses and notices with redistributed copies.
+
+## Common software renderer
+
+PC Tonic and File Beholder use the same companion under `../sk-iced/renderer`.
+The UI library remains pinned to its public Git revision; the renderer and shared
+test support are explicitly selected by local paths. Run
+`python scripts/verify-renderer.py` before direct Cargo commands, and run
+`cargo test -p iced_tiny_skia --lib --locked` plus the
+`open_themed_dropdowns_remain_pixel_identical_after_partial_repaints` test when
+updating it. The build/package scripts verify the shared snapshot. Source ZIPs
+contain the full matching companion and rewrite these paths internally.

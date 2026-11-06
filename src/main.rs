@@ -3364,3 +3364,6 @@ mod requested_search_tree_tests {
 
 #[cfg(test)]
 mod readme_captures;
+
+#[cfg(test)]
+mod renderer_regression;

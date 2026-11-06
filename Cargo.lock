@@ -476,6 +476,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sk-iced",
+ "sk-iced-renderer-regression",
  "tiny-skia",
  "windows-sys 0.61.2",
 ]
@@ -2057,6 +2058,17 @@ dependencies = [
  "iced_renderer",
  "iced_widget",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "sk-iced-renderer-regression"
+version = "0.1.0"
+dependencies = [
+ "iced_core",
+ "iced_graphics",
+ "iced_renderer",
+ "iced_widget",
+ "tiny-skia",
 ]
 
 [[package]]

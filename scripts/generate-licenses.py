@@ -15,6 +15,8 @@ def cargo(*args):
 
 
 def generate(target):
+    import runpy
+    kit = runpy.run_path(str(ROOT / "scripts/verify-renderer.py"))["shared_renderer"]()
     metadata = json.loads(cargo("metadata", "--locked", "--offline", "--format-version", "1", "--filter-platform", target))
     tree = cargo("tree", "--locked", "--offline", "--target", target,
                  "--edges", "normal,build", "--prefix", "none", "--format", "{p}")
@@ -49,6 +51,7 @@ def generate(target):
         })
     return json.dumps({
         "target": target,
+        "renderer_snapshot_sha256": hashlib.sha256((kit / "SHA256SUMS.json").read_bytes()).hexdigest(),
         "lock_sha256": hashlib.sha256((ROOT / "Cargo.lock").read_bytes()).hexdigest(),
         "components": components,
     }, ensure_ascii=False, indent=2) + "\n"
