@@ -77,7 +77,14 @@ impl App {
                             .style(t.button(choice == transfers::ConflictChoice::KeepBoth, false))
                             .on_press(Message::ResolveConflict(choice)).into()
                     })).width(220)
-                    .spacing(10)
+                    .spacing(10),
+                    // Adds the new "apply to all" checkbox ui, matching existing style
+                    crate::typography::checkbox(self.conflict_apply_all)
+                        .label("Apply to all remaining conflicts")
+                        .text_size(13)
+                        .size(15)
+                        .style(t.check())
+                        .on_toggle(Message::ConflictApplyAll),
                 ]
                 .spacing(18),
             )

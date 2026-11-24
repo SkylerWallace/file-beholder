@@ -501,6 +501,10 @@ struct App {
         PathBuf,
         std::sync::mpsc::SyncSender<transfers::ConflictChoice>,
     )>,
+    // Add checkbox for apply to all remaining conflicts
+    conflict_apply_all: bool,
+    // And remember the choice for ensuing conflicts in a job
+    conflict_remembered: Option<(u64, transfers::ConflictChoice)>,
     panes: [Panel; 4],
     pane_count: usize,
     preferences: preferences::Preferences,
@@ -597,6 +601,8 @@ enum Message {
     ToggleQueue,
     ResizeTransfers(f32),
     ResolveConflict(transfers::ConflictChoice),
+    // Enable message for conflict apply all checkbox
+    ConflictApplyAll(bool),
     WindowReady(Option<iced::window::Id>),
     FileAction(FileAction),
     Confirm(bool),
@@ -707,6 +713,9 @@ impl App {
             shadow_picker: None,
             queue_batch: 0,
             conflict: None,
+            // Don't apply to all by default
+            conflict_apply_all: false,
+            conflict_remembered: None,
             panes: [
                 Panel::new(home.clone()),
                 Panel::new(right.clone()),
@@ -1501,6 +1510,11 @@ impl App {
             Message::ResolveConflict(choice) => {
                 if let Some((_, _, reply)) = self.conflict.take() {
                     self.dont_ask_again = false;
+                    // Makes sure that the apply to all conflict setting is asked for each job
+                    if self.conflict_apply_all {
+                        self.conflict_remembered = self.running_job.map(|id| (id, choice));
+                    }
+                    self.conflict_apply_all = false;
                     if let Some(job) = self
                         .jobs
                         .iter_mut()
@@ -1710,6 +1724,7 @@ impl App {
             Message::UndoTick => self.undo_frame = self.undo_frame.wrapping_add(1),
             Message::StatusHover(panel) => self.status_hovered = panel,
             Message::DontAskAgain(value) => self.dont_ask_again = value,
+            Message::ConflictApplyAll(value) => self.conflict_apply_all = value,
             Message::ColumnPropertiesLoaded => {
                 for pane in &mut self.panes[..self.pane_count] {
                     if matches!(pane.sort, Sort::Property(_)) {
