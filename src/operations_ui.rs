@@ -207,6 +207,13 @@ impl App {
         }
         match event {
             transfers::Event::Conflict(source, target, reply) => {
+                // If a remembered choice for conflict apply all is present, doesn't show the dialog anymore
+                if let Some((job_id, choice)) = self.conflict_remembered {
+                    if job_id == id {
+                        let _ = reply.send(choice);
+                        return Task::none();
+                    }
+                }
                 self.dont_ask_again = false;
                 self.conflict = Some((source, target, reply));
                 job.state = "Needs input";
